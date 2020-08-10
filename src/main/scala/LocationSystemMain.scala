@@ -1,34 +1,36 @@
-import LocationSystem.{Runner, Tower, TowerTriangulation}
-import akka.actor.{ActorSystem, Props}
-
-
+import TriangulationSystem.{TowerTriangulation}
+import akka.actor.{ActorRef, ActorSystem, Props}
+import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.concurrent.Await
 import scala.io.StdIn
+import TowersManager.retrieveAvailableTowers
 
 object LocationSystemMain extends App {
-  val locationSystem = ActorSystem("TowerAggregation")
-  val tower = locationSystem.actorOf(Props[Tower],"tower")
-  val towerTriangulation = locationSystem.actorOf(Props(new TowerTriangulation(tower)),"trinagulator")
-  val runner = locationSystem.actorOf(Props(new Runner(towerTriangulation)), "runner")
-
-  //val service = system.actorOf(ServiceWithoutCB.props, "Service")
-  val service = locationSystem.actorOf(ServiceWithCB.props, "Service")
+  implicit val locationSystem = ActorSystem("LocationSystem")
+  val towers = retrieveAvailableTowers
+  val towerTriangulation = locationSystem.actorOf(Props(new TowerTriangulation(towers)),"triangulation")
+  val service = locationSystem.actorOf(LocationServiceWithCB.props, "SatelliteService")
 
   // Create the user actors
-  val userCount = 10
-  (1 to userCount).foreach(createUser)
+  val userCount = 1
+  (1 to userCount).foreach(i=>createDevice(towerTriangulation,i))
+  // gestion of more ask
+
+
 
   // Let this run until the user wishes to stop
   println("System running, press enter to shutdown")
   StdIn.readLine()
 
   // We're done, shutdown
-  Await.result(system.terminate(), 3 seconds)
+  Await.result(locationSystem.terminate(), 3 seconds)
 
-  private def createDevice(i: Int): Unit = {
-    import system.dispatcher
-    system.scheduler.scheduleOnce(i seconds) {
-      system.actorOf(UserActor.props(service), s"User$i")
+  private def createDevice(towerTriangulation:ActorRef,i: Int): Unit = {
+    import locationSystem.dispatcher
+    locationSystem.scheduler.scheduleOnce(i seconds) {
+      println(i)
+      locationSystem.actorOf(DeviceActor.props(s"$i",towerTriangulation,service), s"User$i")
     }
   }
 }

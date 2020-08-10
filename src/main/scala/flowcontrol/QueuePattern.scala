@@ -96,7 +96,7 @@ object QueuePattern {
     val sys = ActorSystem("pi")
     import sys.dispatcher
     val calculator = sys.actorOf(Props(new Manager), "manager")
-    implicit val timeout = Timeout(10.seconds)
+    implicit val timeout = Timeout(1000.seconds)
     val futures =
       (1 to 1000000).map(i =>
         (calculator ? (Job(i, i, _)))

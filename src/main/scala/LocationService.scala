@@ -1,66 +1,46 @@
 
-import akka.actor.{Actor, ActorLogging, Props}
-import scala.concurrent.duration._
-import akka.pattern.pipe
-import LocationService._
-import akka.pattern.CircuitBreaker
+import akka.actor.{Actor, ActorContext, ActorLogging, Props}
+import akka.pattern.extended.ask
 
-import scala.concurrent.Future
+import scala.language.postfixOps
+import LocationService._
+import SatelliteService.{Job, JobResult, SatelliteManager}
+import TriangulationSystem.Point
+import akka.util.Timeout
+
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 object LocationService {
-  case object Request
-  case object Response
+  case class SatelliteRequest(inputPoints: List[Point])
+  case class SatelliteResponse(location: Point)
 }
 
 trait LocationService {
   self: ActorLogging =>
-
   // Max count and delays
   private val normalDelay = 100
-  private val restartDelay = 3200  // Exercise: Test with < 3000 and > 3000
+  private val restartDelay = 32000  // Exercise: Test with < 3000 and > 3000
 
-  protected def callLocationServiceSatellite(): Response.type = {
+  protected def callLocationServiceSatellite(context:ActorContext, inputPoints: List[Point]): Future[SatelliteResponse.type] = {
+    val satellite = context.actorOf(Props(new SatelliteManager))
+    implicit val timeout = Timeout(10.seconds)
+    val future = satellite ? (Job(1,inputPoints,_))
+    val result = Await.result(future,timeout.duration)
+    result match {
+      case JobResult(_,location) => SatelliteResponse(location)
+    }
     //Here call satellite
-    if(Random.nextDouble() <= 0.9 ) {
+    """if(Random.nextDouble() <= 0.9 ) {
       Thread.sleep(normalDelay)
     } else {
       // Service shuts down, takes a while to come back up
-      log.error("!! Service overloaded !! Restarting !!")
+      println("!! Service overloaded !! Restarting !!")
       Thread.sleep(restartDelay)
-    }
+    }"""
 
-    Response
+
   }
 }
-
-object LocationServiceWithCB {
-  def props: Props =
-    Props(new LocationServiceWithCB)
-}
-
-class LocationServiceWithCB extends Actor with ActorLogging with LocationService {
-
-  import context.dispatcher
-
-  val breaker =
-    new CircuitBreaker(
-      context.system.scheduler,
-      maxFailures = 1,
-      callTimeout = 2 seconds,
-      resetTimeout = 10 seconds).
-      onOpen(notifyMe("Open")).
-      onClose(notifyMe("Closed")).
-      onHalfOpen(notifyMe("Half Open"))
-
-  private def notifyMe(state: String): Unit =
-    log.warning(s"My CircuitBreaker is now $state")
-
-  override def receive: Receive = {
-    case Request =>
-      breaker.withCircuitBreaker(Future(callLocationServiceSatellite())) pipeTo sender()
-  }
-
-}
-
 

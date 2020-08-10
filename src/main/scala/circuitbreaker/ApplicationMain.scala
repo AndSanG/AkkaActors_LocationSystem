@@ -11,6 +11,7 @@ import scala.concurrent.duration._
 import scala.io.StdIn
 import scala.language.postfixOps
 
+
 object ApplicationMain extends App {
 
   // Create the system and service
@@ -21,8 +22,11 @@ object ApplicationMain extends App {
 
   // Create the user actors
   val userCount = 10
-  (1 to userCount).foreach(createUser)
-
+  //(1 to userCount).foreach(createUser)
+  val a = (1 to userCount).toList.map(i=>{
+    createUser(i)
+  }).toList
+  println(a)
   // Let this run until the user wishes to stop
   println("System running, press enter to shutdown")
   StdIn.readLine()
@@ -32,10 +36,12 @@ object ApplicationMain extends App {
 
 
 
+
   private def createUser(i: Int): Unit = {
     import system.dispatcher
     system.scheduler.scheduleOnce(i seconds) {
-      system.actorOf(UserActor.props(service), s"User$i")
+      val actor = system.actorOf(UserActor.props(service), s"User$i")
     }
   }
+
 }
