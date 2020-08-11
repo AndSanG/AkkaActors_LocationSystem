@@ -9,11 +9,13 @@ object TowerActor {
 
 class TowerActor(point: Point) extends Actor{
   val towerLocation = point
+  val towerId = self.path.name
   def receive = {
     case GetTowerLocation(user,replyTo)=>{
       //triangulation system timeout is 1 second
-      Thread.sleep(Random.between(100,2000))
-      replyTo ! TowerLocationResult(user, towerLocation)
+      //Thread.sleep(Random.between(950,1200)) // big chance for failure
+      Thread.sleep(Random.between(50,1100)) // very little chance for failure
+      replyTo ! TowerLocationResult(user, towerLocation, towerId)
     }
   }
 }

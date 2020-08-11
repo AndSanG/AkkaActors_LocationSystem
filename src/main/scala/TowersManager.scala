@@ -9,13 +9,14 @@ object TowersManager {
   //map with the location of available towers
   //tower 1,2,3 form a congested zone perimeter < 10km
   val towerLocation = Map(
-    1 -> Point(8.5,5.0),
-    2 -> Point(11.5,5.0),
-    3 -> Point(10.0,5.0),
-    4 -> Point(2.0,6.0),
-    5 -> Point(20.0,7.0),
+    "A" -> Point(2.0,2.0),
+    "B" -> Point(4.0,2.0),
+    "C" -> Point(2.0,4.0),
+    "D" -> Point(4.0,4.0),
+    "E" -> Point(3.0,6.0),
   )
 
+  //this create the predefined towers to use and its location
   def retrieveAvailableTowers: List[ActorRef] ={
     var towers = new ListBuffer[ActorRef]
     towerLocation.foreach{case(key, point)=>{

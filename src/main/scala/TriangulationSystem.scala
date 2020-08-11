@@ -6,22 +6,22 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-object TriangulationSystem extends App{
+object TriangulationSystem {
   case class Point(x: Double, y: Double)
 
   case class GetTowerLocation(user:String, replyTo:ActorRef)
-  case class TowerLocationResult(user:String, point: Point)
+  case class TowerLocationResult(user:String, point: Point, towerId:String)
 
-  case class GetLocationTriangulation(user: String, replyTo: ActorRef)
+  case class GetLocationTriangulation(device: String, replyTo: ActorRef)
   case class LocationTriangulationResult(user: String, locations: List[Point])
 
   class LocationTriangulationResultBuilder(user:String){
     private var locations = new ListBuffer[Point]
-    private var hasreceivedTimeout = false
+    var hasreceivedTimeout = false
     def addTowerLocation(point:Point) : ListBuffer[Point] = {
       this.locations += point}
     def sendResponse() : Boolean = {
-      locations.size == 3 || hasreceivedTimeout
+      locations.size == 3
     }
     def timeout() ={
       hasreceivedTimeout = true
@@ -35,7 +35,6 @@ object TriangulationSystem extends App{
     def receive : Receive = {
       case GetLocationTriangulation(user,replyTo)=>
         val aggregator = context.actorOf(Props(new TowerAggregator(user,replyTo)))
-        //more instances ?
         towers.foreach(tower =>{
           tower ! GetTowerLocation(user,aggregator)
         })
@@ -47,17 +46,16 @@ object TriangulationSystem extends App{
     val builder = new LocationTriangulationResultBuilder(user)
     context.setReceiveTimeout(1 seconds)
     def receiveResult : Receive = {
-      case TowerLocationResult(user,point) => {
-        println("Aggregator received result")
+      case TowerLocationResult(user,point,towerId) => {
+        //println(s"Aggregator received result from $towerId for device $user ")
         builder.addTowerLocation(point)}
       case ReceiveTimeout =>
-        println("timeout")
+        println(s"timeout for device $user")
         builder.timeout()
     }
     def checkComplete:Receive = {
       case msg =>
         if(builder.sendResponse()){
-          println("Result Complete")
           replyTo ! builder.result
           context.stop(self)
         }

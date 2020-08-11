@@ -1,5 +1,6 @@
 import LocationService.{SatelliteRequest, SatelliteResponse}
-import TriangulationSystem.{GetLocationTriangulation, LocationTriangulationResult}
+import LocationSystemMain.SearchLocation
+import TriangulationSystem.{GetLocationTriangulation, LocationTriangulationResult, Point}
 import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.pattern.AskTimeoutException
@@ -22,48 +23,55 @@ object DeviceActor {
 class DeviceActor(MIN: String,towerTriangulation: ActorRef, satelliteService: ActorRef) extends Actor with ActorLogging{
 
   import context.dispatcher
-
   // Max time the user will stick around waiting for a response
   private val userWaitTimeout = Timeout(3 seconds)
-
-  // Send our first request
-  // sendRequest() //this launches interaction with server at creation what i want its to call after receive the Towers response
-  // on creation should be ask the Tower triangulation
-  towerTriangulation ! GetLocationTriangulation(user = s"cell$MIN",replyTo = self)
+  private var outstandingRequest = List[Point]()
+  val deviceMIN = MIN
+  // on creation it asks the Tower triangulation
+  def askTriangulationSystem() = towerTriangulation ! GetLocationTriangulation(device = s"device$deviceMIN",replyTo = self)
+  //askTriangulationSystem()
   override def receive: Receive = {
+
+    //start the location search
+    case SearchLocation => askTriangulationSystem()
+
     //Satellite
-    case SatelliteResponse =>
-      println("Got a quick response, I'm a happy actor")
-      //sendRequest()
+    case SatelliteResponse(successful: Boolean, location: Point, request:SatelliteRequest) =>
+      if (successful){
+        println(s"Got a quick response in device $deviceMIN the location is $location")
+        outstandingRequest = List[Point]()
+      }else{
+        println(s"Satellite rejected the petition for device ${request.device}, trying again in a few seconds")
+        sendRequest(request,5 seconds)
+      }
 
     // This timeout happens if the service does not respond after a while
     case Failure(ex: AskTimeoutException) =>
-      println("Got bored of waiting, I'm outta here!")
+      println(s" Device $deviceMIN got bored of waiting")
+      outstandingRequest = List[Point]()
       context.stop(self)
 
     // This failure happens quickly if the Circuit Breakers are enabled
     case Failure(ex: Exception) =>
-      println("Something must be wrong with the server, let me try again in a few seconds")
-      //sendRequest(5 seconds)
+      println("Something must be wrong with the Location Service, let me try again in a few seconds")
+      sendRequest(SatelliteRequest(deviceMIN,outstandingRequest),5 seconds)
+
 
     //Triangulation Service
     case triangulationResult: LocationTriangulationResult =>
-      print(triangulationResult.locations)
-      //context.system.terminate() // part of aggregator
+      outstandingRequest = triangulationResult.locations
       if (triangulationResult.locations.size < 3){
-        println("failed attempt, retrying later")
+        println(s"failed attempt in device $deviceMIN, retrying later")
         Thread.sleep(200)
-        towerTriangulation ! GetLocationTriangulation(user = "cell",replyTo = self)
+        towerTriangulation ! GetLocationTriangulation(device = s"device$deviceMIN",replyTo = self)
       }else{
-        sendRequest(SatelliteRequest(triangulationResult.locations))
+        println(s"Triangulation complete for device $deviceMIN: ${triangulationResult.locations}")
+        sendRequest(SatelliteRequest(deviceMIN, triangulationResult.locations))
       }
-
-
-    case other => log.info(s"Got another message: $other")
+    case other => println(s"Got another message: $other")
   }
 
   private def sendRequest(satelliteRequest: SatelliteRequest,delay: FiniteDuration = 1 second) = {
-    // Send a message, pipe response to ourselves
     context.system.scheduler.scheduleOnce(delay) {
       satelliteService.ask(satelliteRequest)(userWaitTimeout) pipeTo self
     }

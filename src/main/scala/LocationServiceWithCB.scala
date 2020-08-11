@@ -10,7 +10,8 @@ object LocationServiceWithCB {
   def props: Props =
     Props(new LocationServiceWithCB)
 }
-
+// This class implements a service that ask the satellite about the location, implements a circuit Breaker
+// to prevent errors propagation
 class LocationServiceWithCB extends Actor with ActorLogging with LocationService {
 
   import context.dispatcher
@@ -29,8 +30,8 @@ class LocationServiceWithCB extends Actor with ActorLogging with LocationService
     println(s"My CircuitBreaker is now $state")
 
   override def receive: Receive = {
-    case SatelliteRequest(inputPoints) =>
-      breaker.withCircuitBreaker(Future(callLocationServiceSatellite(context,inputPoints))) pipeTo sender()
+    case SatelliteRequest(device,inputPoints) =>
+      breaker.withCircuitBreaker(Future(callLocationServiceSatellite(context,SatelliteRequest(device,inputPoints)))) pipeTo sender()
   }
 
 }
