@@ -42,7 +42,7 @@ class DeviceActor(MIN: String,towerTriangulation: ActorRef, satelliteService: Ac
         outstandingRequest = List[Point]()
       }else{
         println(s"Satellite rejected the petition for device ${request.device}, trying again in a few seconds")
-        sendRequest(request,5 seconds)
+        sendRequestToSatelliteService(request,5 seconds)
       }
 
     // This timeout happens if the service does not respond after a while
@@ -54,7 +54,7 @@ class DeviceActor(MIN: String,towerTriangulation: ActorRef, satelliteService: Ac
     // This failure happens quickly if the Circuit Breakers are enabled
     case Failure(ex: Exception) =>
       println("Something must be wrong with the Location Service, let me try again in a few seconds")
-      sendRequest(SatelliteRequest(deviceMIN,outstandingRequest),5 seconds)
+      sendRequestToSatelliteService(SatelliteRequest(deviceMIN,outstandingRequest),5 seconds)
 
 
     //Triangulation Service
@@ -66,12 +66,12 @@ class DeviceActor(MIN: String,towerTriangulation: ActorRef, satelliteService: Ac
         towerTriangulation ! GetLocationTriangulation(device = s"device$deviceMIN",replyTo = self)
       }else{
         println(s"Triangulation complete for device $deviceMIN: ${triangulationResult.locations}")
-        sendRequest(SatelliteRequest(deviceMIN, triangulationResult.locations))
+        sendRequestToSatelliteService(SatelliteRequest(deviceMIN, triangulationResult.locations))
       }
     case other => println(s"Got another message: $other")
   }
 
-  private def sendRequest(satelliteRequest: SatelliteRequest,delay: FiniteDuration = 1 second) = {
+  private def sendRequestToSatelliteService(satelliteRequest: SatelliteRequest,delay: FiniteDuration = 1 second) = {
     context.system.scheduler.scheduleOnce(delay) {
       satelliteService.ask(satelliteRequest)(userWaitTimeout) pipeTo self
     }

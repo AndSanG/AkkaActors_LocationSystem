@@ -9,9 +9,6 @@ import scala.language.postfixOps
 object TriangulationSystem {
   case class Point(x: Double, y: Double)
 
-  case class GetTowerLocation(user:String, replyTo:ActorRef)
-  case class TowerLocationResult(user:String, point: Point, towerId:String)
-
   case class GetLocationTriangulation(device: String, replyTo: ActorRef)
   case class LocationTriangulationResult(user: String, locations: List[Point])
 
