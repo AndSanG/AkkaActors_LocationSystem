@@ -21,7 +21,7 @@ object LocationSystemMain extends App {
   val sateliteLocationService = locationSystem.actorOf(LocationServiceWithCB.props, "SatelliteService")
 
   // Create the device actors
-  val deviceCount = 10
+  val deviceCount = 100
   var devices = new ListBuffer[ActorRef]
   (1 to deviceCount).foreach(i=>{
     devices += createDevice(towerTriangulation,i)})
